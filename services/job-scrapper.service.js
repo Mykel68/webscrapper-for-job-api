@@ -1,7 +1,10 @@
+const puppeteerScraper = require('../utils/puppeteerScraper');
+// You can still import axios-based scrapers if needed
 const scraper = require('../utils/scraper');
 
 exports.scrapeAllJobPlatforms = async () => {
     try {
+        // Use Puppeteer for Indeed and axios-based for others, for instance
         const [
             indeedJobs,
             monsterJobs,
@@ -9,7 +12,7 @@ exports.scrapeAllJobPlatforms = async () => {
             careerBuilderJobs,
             simplyHiredJobs
         ] = await Promise.all([
-            scraper.scrapeIndeed(),
+            puppeteerScraper.scrapeIndeedWithPuppeteer(),
             scraper.scrapeMonster(),
             scraper.scrapeGlassdoor(),
             scraper.scrapeCareerBuilder(),
@@ -23,6 +26,7 @@ exports.scrapeAllJobPlatforms = async () => {
             ...simplyHiredJobs
         ];
     } catch (error) {
+        console.error('Error in scraping service:', error.message);
         throw error;
     }
 };
