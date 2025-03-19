@@ -1,6 +1,10 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
 const axiosRetry = require('axios-retry').default || require('axios-retry');
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+
+puppeteer.use(StealthPlugin());
 
 
 // Enable retry with exponential delay for failed requests
@@ -14,31 +18,63 @@ axiosRetry(axios, {
 });
 
 // Scrape Indeed job listings
-const scrapeIndeed = async () => {
+const scrapeIndeed = async (searchQuery, location) => {
+    const formattedQuery = searchQuery.replace(/\s+/g, '+');
+    const formattedLocation = location.replace(/\s+/g, '+');
+    const url = `https://www.indeed.com/jobs?q=${formattedQuery}&l=${formattedLocation}`;
+
     try {
-        const url = 'https://www.indeed.com/jobs?q=software+developer';
-        const { data } = await axios.get(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
-                'Accept-Language': 'en-US,en;q=0.9'
-            }
-        });
-        const $ = cheerio.load(data);
+        const browser = await puppeteer.launch({ headless: true });
+        const page = await browser.newPage();
+
+        // Set a realistic User-Agent
+        await page.setUserAgent(
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+            'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
+        );
+
+        // Navigate to the Indeed search results page
+        await page.goto(url, { waitUntil: 'networkidle2' });
+
+        // Wait for job cards to load
+        await page.waitForSelector('a.tapItem');
+
+        // Extract the page content
+        const content = await page.content();
+        const $ = cheerio.load(content);
         const jobs = [];
-        $('.jobsearch-SerpJobCard').each((i, el) => {
-            const title = $(el).find('.jobtitle').text().trim();
-            const company = $(el).find('.company').text().trim();
-            const location = $(el).find('.location').text().trim();
-            const relativeLink = $(el).find('a').attr('href');
-            const link = relativeLink ? `https://www.indeed.com${relativeLink}` : '';
-            jobs.push({ title, company, location, link });
+
+        // Parse job listings
+        $('a.tapItem').each((index, element) => {
+            const jobTitle = $(element).find('h2.jobTitle span').text().trim();
+            const company = $(element).find('.companyName').text().trim();
+            const location = $(element).find('.companyLocation').text().trim();
+            const summary = $(element).find('.job-snippet').text().trim();
+            const postDate = $(element).find('.date').text().trim();
+            const jobLink = 'https://www.indeed.com' + $(element).attr('href');
+
+            jobs.push({
+                jobTitle,
+                company,
+                location,
+                summary,
+                postDate,
+                jobLink,
+            });
         });
+
+        await browser.close();
         return jobs;
     } catch (error) {
-        console.error('Error scraping Indeed:', error.message);
+        console.error('Error scraping Indeed:', error);
         return [];
     }
 };
+
+// Example usage
+// scrapeIndeed('software developer', 'New York, NY').then((jobs) =>
+//     console.log(jobs)
+// );
 
 // Scrape Monster job listings
 const scrapeMonster = async () => {
