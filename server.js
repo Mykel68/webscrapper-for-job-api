@@ -1,6 +1,6 @@
 const express = require('express');
 const app = express();
-const jobRoutes = require('./routes/job-routes');
+const jobRoutes = require('./routes/job.routes');
 const logger = require('./middlewares/logger');
 
 // Global middleware
