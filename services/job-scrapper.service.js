@@ -13,11 +13,11 @@ exports.scrapeAllJobPlatforms = async () => {
             simplyHiredJobs
         ] = await Promise.all([
             // puppeteerScraper.scrapeIndeedWithPuppeteer(),
-            scraper.scrapeIndeed(),
-            scraper.scrapeMonster(),
-            scraper.scrapeGlassdoor(),
-            scraper.scrapeCareerBuilder(),
-            scraper.scrapeSimplyHired()
+            scraper.scrapeIndeed('Software developer', 'Remote'),
+            scraper.scrapeMonster('Software developer', 'Remote'),
+            scraper.scrapeGlassdoor('Software developer', 'Remote'),
+            scraper.scrapeCareerBuilder('Software developer', 'Remote'),
+            scraper.scrapeSimplyHired('Software developer', 'Remote')
         ]);
         return [
             ...indeedJobs,

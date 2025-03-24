@@ -6,8 +6,7 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 
 puppeteer.use(StealthPlugin());
 
-
-// Enable retry with exponential delay for failed requests
+// Enable retry with exponential delay for failed axios requests
 axiosRetry(axios, {
     retries: 3,
     retryDelay: axiosRetry.exponentialDelay,
@@ -17,72 +16,78 @@ axiosRetry(axios, {
     }
 });
 
-// Scrape Indeed job listings
+/**
+ * Scrape Indeed using Puppeteer.
+ * This version uses headless: false for debugging; set headless: true when production-ready.
+ */
 const scrapeIndeed = async (searchQuery, location) => {
+    if (typeof searchQuery !== 'string' || typeof location !== 'string') {
+        throw new Error('searchQuery and location must be strings');
+    }
+
     const formattedQuery = searchQuery.replace(/\s+/g, '+');
     const formattedLocation = location.replace(/\s+/g, '+');
     const url = `https://www.indeed.com/jobs?q=${formattedQuery}&l=${formattedLocation}`;
 
     try {
-        const browser = await puppeteer.launch({ headless: true });
+        // For debugging, headless: false allows you to see the browser
+        const browser = await puppeteer.launch({ headless: false, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
         const page = await browser.newPage();
 
-        // Set a realistic User-Agent
         await page.setUserAgent(
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
             'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
         );
 
-        // Navigate to the Indeed search results page
         await page.goto(url, { waitUntil: 'networkidle2' });
 
-        // Wait for job cards to load
-        await page.waitForSelector('a.tapItem');
+        // Take a screenshot for debugging to see if a CAPTCHA or block page is served
+        await page.screenshot({ path: 'indeed_debug.png', fullPage: true });
 
-        // Extract the page content
+        // Wait for job cards to appear using an updated selector (increase timeout if needed)
+        await page.waitForSelector('div.job_seen_beacon', { timeout: 60000 });
+
         const content = await page.content();
         const $ = cheerio.load(content);
         const jobs = [];
 
-        // Parse job listings
-        $('a.tapItem').each((index, element) => {
-            const jobTitle = $(element).find('h2.jobTitle span').text().trim();
+        $('div.job_seen_beacon').each((index, element) => {
+            const jobTitle = $(element).find('h2.jobTitle').text().trim();
             const company = $(element).find('.companyName').text().trim();
-            const location = $(element).find('.companyLocation').text().trim();
+            const jobLocation = $(element).find('.companyLocation').text().trim();
             const summary = $(element).find('.job-snippet').text().trim();
-            const postDate = $(element).find('.date').text().trim();
-            const jobLink = 'https://www.indeed.com' + $(element).attr('href');
+            const relativeLink = $(element).find('a').attr('href');
+            const jobLink = relativeLink ? `https://www.indeed.com${relativeLink}` : '';
 
-            jobs.push({
-                jobTitle,
-                company,
-                location,
-                summary,
-                postDate,
-                jobLink,
-            });
+            if (jobTitle) {
+                jobs.push({
+                    jobTitle,
+                    company,
+                    location: jobLocation,
+                    summary,
+                    jobLink,
+                });
+            }
         });
 
         await browser.close();
         return jobs;
     } catch (error) {
-        console.error('Error scraping Indeed:', error);
+        console.error('Error scraping Indeed:', error.message);
         return [];
     }
 };
 
-// Example usage
-// scrapeIndeed('software developer', 'New York, NY').then((jobs) =>
-//     console.log(jobs)
-// );
-
-// Scrape Monster job listings
+/**
+ * Scrape Monster job listings using axios and cheerio.
+ */
 const scrapeMonster = async () => {
     try {
         const url = 'https://www.monster.com/jobs/search/?q=Software-Developer';
         const { data } = await axios.get(url, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+                    'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
                 'Accept-Language': 'en-US,en;q=0.9'
             }
         });
@@ -102,13 +107,16 @@ const scrapeMonster = async () => {
     }
 };
 
-// Scrape Glassdoor job listings
+/**
+ * Scrape Glassdoor job listings using axios and cheerio.
+ */
 const scrapeGlassdoor = async () => {
     try {
         const url = 'https://www.glassdoor.com/Job/software-developer-jobs-SRCH_KO0,18.htm';
         const { data } = await axios.get(url, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+                    'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
                 'Accept-Language': 'en-US,en;q=0.9'
             }
         });
@@ -129,13 +137,16 @@ const scrapeGlassdoor = async () => {
     }
 };
 
-// Scrape CareerBuilder job listings
+/**
+ * Scrape CareerBuilder job listings using axios and cheerio.
+ */
 const scrapeCareerBuilder = async () => {
     try {
         const url = 'https://www.careerbuilder.com/jobs-software-developer';
         const { data } = await axios.get(url, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+                    'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
                 'Accept-Language': 'en-US,en;q=0.9'
             }
         });
@@ -155,13 +166,16 @@ const scrapeCareerBuilder = async () => {
     }
 };
 
-// Scrape SimplyHired job listings
+/**
+ * Scrape SimplyHired job listings using axios and cheerio.
+ */
 const scrapeSimplyHired = async () => {
     try {
         const url = 'https://www.simplyhired.com/search?q=software+developer';
         const { data } = await axios.get(url, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+                    'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
                 'Accept-Language': 'en-US,en;q=0.9'
             }
         });

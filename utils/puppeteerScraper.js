@@ -101,7 +101,7 @@ const scrapeIndeed = async (searchQuery, location) => {
     }
 };
 
-// Example usage
-scrapeIndeed('software developer', 'New York, NY').then((jobs) =>
-    console.log(jobs)
-);
+// // Example usage
+// scrapeIndeed('software developer', 'Remote').then((jobs) =>
+//     console.log(jobs)
+// );
